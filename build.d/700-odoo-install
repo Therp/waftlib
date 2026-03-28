@@ -16,16 +16,16 @@ log INFO Installing Odoo from "${src}"
 cd "${ODOO_WORK_DIR}" && \
 source .venv/bin/activate && \
 if [[ "${ODOO_VERSION}" == "8.0" ]]; then
-  pip install --no-cache-dir --no-deps "${src}"
+  python -m pip install --no-cache-dir --no-deps "${src}"
 elif [[ "${ODOO_VERSION}" == "9.0" ]] || \
 [[ "${ODOO_VERSION}" == "10.0" ]] || \
 [[ "${ODOO_VERSION}" == "11.0" ]] || \
 [[ "${ODOO_VERSION}" == "12.0" ]] || \
 [[ "${ODOO_VERSION}" == "13.0" ]] || \
 [[ "${ODOO_VERSION}" == "14.0" ]]; then
-  pip install --no-cache-dir "${src}"
+  python -m pip install --no-cache-dir "${src}"
 else
-  pip install -e "${src}"
+  python -m pip install --no-deps -e "${src}"
 fi
 
 # Make version 8.0 and 9.0 have an `odoo` executable

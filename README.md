@@ -102,7 +102,7 @@ OR:
 
 # edit requirements.txt, add the module you want
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 
 # Then commit and push to share the new requirements.txt with colleagues
 ```
