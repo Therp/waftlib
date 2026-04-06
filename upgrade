@@ -14,10 +14,11 @@ if [ "${#}" -eq 0 ]; then
   exit
 fi
 
-cd "${ODOO_WORK_DIR}" && . .venv/bin/activate && \
+cd "${ODOO_WORK_DIR}" && \
+ . "${ODOO_WORK_DIR}/.venv/bin/activate" && \
 
 if [[ "${ODOO_I18N_OVERWRITE,,}" != 'true' ]] ; then
-  odoo -c ./auto/odoo.conf -u "${1}" --xmlrpc-port 18069 --stop-after-init
+  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --xmlrpc-port 18069 --stop-after-init
 else
-  odoo -c ./auto/odoo.conf -u "${1}" --xmlrpc-port 18069 --stop-after-init --i18n-overwrite
+  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --xmlrpc-port 18069 --stop-after-init --i18n-overwrite
 fi

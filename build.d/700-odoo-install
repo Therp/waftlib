@@ -6,26 +6,26 @@ SCRIPT_PATH="$(cd "$(/usr/bin/dirname "${0}")" && /bin/pwd)"
 ODOO_WORK_DIR="$(cd "${SCRIPT_PATH}/../.." && /bin/pwd)"
 . "${ODOO_WORK_DIR}/.env-default" && \
 . "${ODOO_WORK_DIR}/.env-shared" && \
-. "${ODOO_WORK_DIR}/.env-secret"
+. "${ODOO_WORK_DIR}/.env-secret" && \
+. "${ODOO_WORK_DIR}/.venv/bin/activate" && \
 cd "${ODOO_WORK_DIR}"
 
 export src="${ODOO_WORK_DIR}/custom/src/odoo"
-log INFO Installing Odoo from "${src}"
+/bin/echo "INFO Installing Odoo from '${src}'"
 
 # Odoo v8 dependencies could crash at install, so we don't use them
 cd "${ODOO_WORK_DIR}" && \
-source .venv/bin/activate && \
 if [[ "${ODOO_VERSION}" == "8.0" ]]; then
-  python -m pip install --no-cache-dir --no-deps "${src}"
+  "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --no-cache-dir --no-deps "${src}"
 elif [[ "${ODOO_VERSION}" == "9.0" ]] || \
 [[ "${ODOO_VERSION}" == "10.0" ]] || \
 [[ "${ODOO_VERSION}" == "11.0" ]] || \
 [[ "${ODOO_VERSION}" == "12.0" ]] || \
 [[ "${ODOO_VERSION}" == "13.0" ]] || \
 [[ "${ODOO_VERSION}" == "14.0" ]]; then
-  python -m pip install --no-cache-dir "${src}"
+  "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --no-cache-dir "${src}"
 else
-  python -m pip install --no-deps -e "${src}"
+  "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --no-deps -e "${src}"
 fi
 
 # Make version 8.0 and 9.0 have an `odoo` executable

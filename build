@@ -24,20 +24,20 @@ fi
 
 # pip 20.3 has a neat depenency resolver
 # https://pip.pypa.io/en/latest/user_guide/#changes-to-the-pip-dependency-resolver-in-20-3-2020
-. .venv/bin/activate && \
-python -m pip install --quiet "setuptools-scm<8.0" && \
+. "${ODOO_WORK_DIR}/.venv/bin/activate" && \
+"${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet "setuptools-scm<8.0" && \
 if [[ "$(/bin/echo "${ODOO_VERSION}" | /usr/bin/cut -d '.' -f1)" -ge 15 ]]; then
   if [[ "$(/bin/echo "${ODOO_VERSION}" | /usr/bin/cut -d '.' -f1)" -le 17 ]]; then
-    python -m pip install --quiet "setuptools>=64,<82"
+    "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet "setuptools>=64,<82"
   else
-    python -m pip install --quiet setuptools
+    "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet setuptools
   fi
 else
-  python -m pip install --quiet "setuptools<82"
+  "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet "setuptools<82"
 fi && \
-python -m pip install --quiet "pip>=20.3" && \
-(python -m pip uninstall --yes -r "${ODOO_WORK_DIR}/requirements-remove-default.txt" 2>/dev/null || /bin/true) && \
-python -m pip install --quiet --exists-action w -r "${ODOO_WORK_DIR}/requirements-default.txt" && \
-python -m pip install --quiet --exists-action w -r "${ODOO_WORK_DIR}/requirements.txt" && \
+"${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet "pip>=20.3" && \
+("${ODOO_WORK_DIR}/.venv/bin/python" -m pip uninstall --yes -r "${ODOO_WORK_DIR}/requirements-remove-default.txt" 2>/dev/null || /bin/true) && \
+"${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet --exists-action w -r "${ODOO_WORK_DIR}/requirements-default.txt" && \
+"${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet --exists-action w -r "${ODOO_WORK_DIR}/requirements.txt" && \
 "${ODOO_WORK_DIR}/common/build" && \
-python "${ODOO_WORK_DIR}/common/entrypoint"
+"${ODOO_WORK_DIR}/.venv/bin/python" "${ODOO_WORK_DIR}/common/entrypoint"

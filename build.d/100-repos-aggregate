@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Version: v.22.05.30
 
 set -e

@@ -5,7 +5,8 @@ SCRIPT_PATH="$(cd "$(/usr/bin/dirname "${0}")" && /bin/pwd)"
 ODOO_WORK_DIR="${SCRIPT_PATH}"
 . "${ODOO_WORK_DIR}/.env-default" && \
 . "${ODOO_WORK_DIR}/.env-shared" && \
-. "${ODOO_WORK_DIR}/.env-secret"
+. "${ODOO_WORK_DIR}/.env-secret" && \
+. "${ODOO_WORK_DIR}/.venv/bin/activate" && \
 cd "${ODOO_WORK_DIR}"
 
-. .venv/bin/activate && odoo -i base -c ./auto/odoo.conf --without-demo=all --stop-after-init
+"${ODOO_WORK_DIR}/.venv/bin/odoo" -i base -c ./auto/odoo.conf --without-demo=all --stop-after-init

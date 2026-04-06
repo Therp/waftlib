@@ -17,5 +17,6 @@ cd "${ODOO_WORK_DIR}"
   fi
 
 # Note: in Odoo 8.0 this requires OCA 'shell' module to be installed.
-cd "${ODOO_WORK_DIR}" && . .venv/bin/activate && \
-odoo shell --config=auto/odoo.conf --"${ODOO_SHELL_PORT}"=18080
+cd "${ODOO_WORK_DIR}" && \
+. "${ODOO_WORK_DIR}/.venv/bin/activate" && \
+"${ODOO_WORK_DIR}/.venv/bin/odoo" shell --config=auto/odoo.conf --"${ODOO_SHELL_PORT}"=18080

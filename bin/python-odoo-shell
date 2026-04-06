@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Version: v.22.05.30
 
 SCRIPT_PATH="$(cd "$(/usr/bin/dirname "${0}")" && /bin/pwd)"
@@ -8,5 +8,6 @@ ODOO_WORK_DIR="$(cd "${SCRIPT_PATH}/../.." && /bin/pwd)"
 . "${ODOO_WORK_DIR}/.env-secret"
 cd "${ODOO_WORK_DIR}"
 
-log WARNING python-odoo-shell is deprecated, use instead: click-odoo
-exec odoo shell -d "${PGDATABASE}" < "${1}"
+/bin/echo 'WARNING python-odoo-shell is deprecated, use instead: click-odoo'
+. "${ODOO_WORK_DIR}/.venv/bin/activate" && \
+exec "${ODOO_WORK_DIR}/.venv/bin/odoo" shell -d "${PGDATABASE}" < "${1}"

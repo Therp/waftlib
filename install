@@ -33,7 +33,9 @@ else
     createdb "${1}"
 fi
 
-cd "${ODOO_WORK_DIR}" && . .venv/bin/activate && odoo \
+cd "${ODOO_WORK_DIR}" && \
+. "${ODOO_WORK_DIR}/.venv/bin/activate" && \
+"${ODOO_WORK_DIR}/.venv/bin/odoo" \
   -c ./auto/odoo.conf \
   --load-language=en_US,nl_NL \
   -i "${2}" \
