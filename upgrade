@@ -24,7 +24,7 @@ else
 fi
 
 if [[ "${ODOO_I18N_OVERWRITE,,}" != 'true' ]] ; then
-  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --"${ODOO_SHELL_PORT}"=18080 --stop-after-init
+  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --"${ODOO_SHELL_PORT}"=18069 --stop-after-init
 else
-  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --"${ODOO_SHELL_PORT}"=18080 --stop-after-init --i18n-overwrite
+  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --"${ODOO_SHELL_PORT}"=18069 --stop-after-init --i18n-overwrite
 fi
