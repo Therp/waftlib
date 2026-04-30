@@ -17,8 +17,14 @@ fi
 cd "${ODOO_WORK_DIR}" && \
  . "${ODOO_WORK_DIR}/.venv/bin/activate" && \
 
-if [[ "${ODOO_I18N_OVERWRITE,,}" != 'true' ]] ; then
-  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --xmlrpc-port 18069 --stop-after-init
+if [[ "$(/bin/echo ${ODOO_VERSION} | /usr/bin/cut -d '.' -f1)" -lt 19 ]]; then
+  export ODOO_SHELL_PORT="xmlrpc-port"
 else
-  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --xmlrpc-port 18069 --stop-after-init --i18n-overwrite
+  export ODOO_SHELL_PORT="http-port"
+fi
+
+if [[ "${ODOO_I18N_OVERWRITE,,}" != 'true' ]] ; then
+  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --"${ODOO_SHELL_PORT}"=18080 --stop-after-init
+else
+  "${ODOO_WORK_DIR}/.venv/bin/odoo" -c ./auto/odoo.conf -u "${1}" --"${ODOO_SHELL_PORT}"=18080 --stop-after-init --i18n-overwrite
 fi
