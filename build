@@ -33,7 +33,11 @@ if [[ "$(/bin/echo "${ODOO_VERSION}" | /usr/bin/cut -d '.' -f1)" -ge 15 ]]; then
     "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet setuptools
   fi
 else
-  "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet "setuptools<82"
+  if [[ "$(/bin/echo "${ODOO_VERSION}" | /usr/bin/cut -d '.' -f1)" -eq 11 ]]; then
+    "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet "setuptools<58"
+  else
+    "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet "setuptools<82"
+  fi
 fi && \
 "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet "pip>=20.3" && \
 ("${ODOO_WORK_DIR}/.venv/bin/python" -m pip uninstall --yes -r "${ODOO_WORK_DIR}/requirements-remove-default.txt" 2>/dev/null || /bin/true) && \
