@@ -1406,12 +1406,18 @@ def run_upgrade(version):
     start_version = os.environ.get("MIGRATION_START_VERSION", None)
     if version == start_version:
         if params["verbose"]:
-            args = f'-u base --log-level=debug_sql --log-handler=odoo.modules.loading:DEBUG --logfile "{logfile}" --stop-after-init'
+            if float(version) <= 10.0:
+                args = f'-u base --log-level=debug --log-handler=odoo.modules.loading:DEBUG --logfile "{logfile}" --stop-after-init'
+            else:
+                args = f'-u base --log-level=debug_sql --log-handler=odoo.modules.loading:DEBUG --logfile "{logfile}" --stop-after-init'
         else:
             args = f'-u base --logfile "{logfile}" --stop-after-init'
     else:
         if params["verbose"]:
-            args = f'-u base --load=openupgrade_framework --log-level=debug_sql --log-handler=odoo.modules.loading:DEBUG --log-handler=odoo.modules.migration:DEBUG --logfile "{logfile}" --stop-after-init'
+            if float(version) <= 10.0:
+                args = f'-u base --load=openupgrade_framework --log-level=debug --log-handler=odoo.modules.loading:DEBUG --log-handler=odoo.modules.migration:DEBUG --logfile "{logfile}" --stop-after-init'
+            else:
+                args = f'-u base --load=openupgrade_framework --log-level=debug_sql --log-handler=odoo.modules.loading:DEBUG --log-handler=odoo.modules.migration:DEBUG --logfile "{logfile}" --stop-after-init'
         else:
             args = f'-u base --load=openupgrade_framework --logfile "{logfile}" --stop-after-init'
     cmd(build_dir + "/run " + args)
