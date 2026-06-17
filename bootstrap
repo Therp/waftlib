@@ -160,15 +160,28 @@ else
   /bin/echo "Python version is ${PYVERSION}"
 
   # Install virtualenv
-  VIRTUALENV="${PYENV_ROOT}/bin/virtualenv.pyz"
-  /bin/echo "INFO: Download ${VIRTUALENV}"
-  (/usr/bin/wget --no-check-certificate "https://bootstrap.pypa.io/virtualenv/${PYVERSION}/virtualenv.pyz" -O "${VIRTUALENV}" || \
-  (/bin/echo "INFO: /usr/bin/wget did not download virtualenv package, try /usr/bin/curl ..." && \
-  /usr/bin/curl -L "https://bootstrap.pypa.io/virtualenv/${PYVERSION}/virtualenv.pyz" -o "${VIRTUALENV}")) || \
-  { /bin/echo 'ERROR: Download of virtualenv package failed!'; exit 1; }
-
-  /bin/echo "INFO: Build virtual environment in ${ODOO_WORK_DIR}/.venv"
-  python "${VIRTUALENV}" .venv || { /bin/echo 'Virtualenv creation failed' ; exit 1; }
+  # virtualenv >= 21.5.0 (released 2026-06-13) dropped support for Python < 3.9
+  # and for creating Python 2.x environments. Odoo <= 15.0 uses Python 2.x or
+  # Python 3.6-3.8, so we install a pinned version via system pip3 for those
+  # targets instead of downloading the latest virtualenv.pyz.
+  if [ "$(/bin/echo "${ODOO_VERSION}" | /usr/bin/cut -d'.' -f1)" -le '15' ]; then
+    /bin/echo "INFO: Installing virtualenv==20.15.1 for Odoo ${ODOO_VERSION} (Python ${PYVERSION}, requires < 3.9 support)"
+    /usr/bin/pip3 install --user --quiet "virtualenv==20.15.1" || \
+    /usr/bin/python3 -m pip install --user --quiet "virtualenv==20.15.1" || \
+    { /bin/echo 'ERROR: Failed to install virtualenv==20.15.1'; exit 1; }
+    /bin/echo "INFO: Build virtual environment in ${ODOO_WORK_DIR}/.venv"
+    /usr/bin/python3 -m virtualenv -p "${PYENV_ROOT}/shims/python" "${ODOO_WORK_DIR}/.venv" || \
+    { /bin/echo 'Virtualenv creation failed'; exit 1; }
+  else
+    VIRTUALENV="${PYENV_ROOT}/bin/virtualenv.pyz"
+    /bin/echo "INFO: Download ${VIRTUALENV}"
+    (/usr/bin/wget --no-check-certificate "https://bootstrap.pypa.io/virtualenv/${PYVERSION}/virtualenv.pyz" -O "${VIRTUALENV}" || \
+    (/bin/echo "INFO: /usr/bin/wget did not download virtualenv package, try /usr/bin/curl ..." && \
+    /usr/bin/curl -L "https://bootstrap.pypa.io/virtualenv/${PYVERSION}/virtualenv.pyz" -o "${VIRTUALENV}")) || \
+    { /bin/echo 'ERROR: Download of virtualenv package failed!'; exit 1; }
+    /bin/echo "INFO: Build virtual environment in ${ODOO_WORK_DIR}/.venv"
+    python "${VIRTUALENV}" .venv || { /bin/echo 'Virtualenv creation failed'; exit 1; }
+  fi
 fi
 
 if [ ! -f "${ODOO_WORK_DIR}/build" ] || [ -L "${ODOO_WORK_DIR}/build" ]; then
