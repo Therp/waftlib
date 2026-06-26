@@ -688,6 +688,7 @@ from click_odoo import OdooEnvironment
 
 MIGRATION_PATH = %r
 ODOO_CONF = %r
+SCRIPT_PATH = %r
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -703,9 +704,35 @@ logging.basicConfig(
 odoo_config.parse_config(["-c", ODOO_CONF])
 
 db_name = odoo_config.get("db_name")
+# Odoo 19.0 changed db_name to type='comma', so config returns a list.
+if isinstance(db_name, list):
+    db_name = db_name[0] if db_name else ""
 if not db_name:
     eprint("No 'db_name' found in Odoo configuration %%r" %% ODOO_CONF)
     sys.exit(1)
+
+# Compatibility shim: OCA fastapi imports 'accept_language' but the PyPI
+# package is 'parse-accept-language' which exposes 'parse_accept_language'.
+import types as _types
+if "accept_language" not in sys.modules:
+    try:
+        from parse_accept_language import parse_accept_language as _paf
+        _m = _types.ModuleType("accept_language")
+        _m.parse_accept_language = _paf
+        sys.modules["accept_language"] = _m
+    except ImportError:
+        pass
+
+# Skip scripts whose X-Supports annotation does not include the current
+# Odoo major version (e.g. scripts marked "X-Supports: 13.0 14.0" on 19.0).
+import re as _xre
+with open(SCRIPT_PATH) as _xsf:
+    _xsrc = _xsf.read()
+_xm = _xre.search(r'#\\s*X-Supports:\\s*(.+)', _xsrc)
+if _xm and odoo.release.major_version not in _xm.group(1).split():
+    print("Skipping script: X-Supports=%%s, current Odoo=%%s" %% (
+        _xm.group(1).strip(), odoo.release.major_version))
+    sys.exit(0)
 
 # Create an Environment using click-odoo's OdooEnvironment context manager
 with OdooEnvironment(database=db_name) as env:
@@ -713,7 +740,7 @@ with OdooEnvironment(database=db_name) as env:
     globals()["env"] = env
 
     # Execute the migration script
-    with open(%r) as f:
+    with open(SCRIPT_PATH) as f:
         __script = f.read()
     exec(__script, globals())
 """ % (
