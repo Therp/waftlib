@@ -726,7 +726,7 @@ if "accept_language" not in sys.modules:
 import re as _xre
 with open(SCRIPT_PATH) as _xsf:
     _xsrc = _xsf.read()
-_xm = _xre.search(r'#\s*X-Supports:\s*(.+)', _xsrc)
+_xm = _xre.search(r'#\\s*X-Supports:\\s*(.+)', _xsrc)
 if _xm and odoo.release.major_version not in _xm.group(1).split():
     print("Skipping script: X-Supports=%%s, current Odoo=%%s" %% (
         _xm.group(1).strip(), odoo.release.major_version))
