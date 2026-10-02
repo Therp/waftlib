@@ -28,7 +28,7 @@ docutils==0.16
 ebaysdk==2.1.5
 freezegun==0.3.15
 geojson==2.5.0
-gevent==21.8.0
+gevent==21.12.0
 git+https://github.com/sunflowerit/git-aggregator.git@b459aee4f35c5b4b8fc2bc4fd826bf4f2639bd3d#egg=git_aggregator
 git+https://github.com/OCA/openupgradelib.git#egg=openupgradelib
 greenlet==1.1.2
