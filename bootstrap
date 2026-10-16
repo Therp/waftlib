@@ -7,10 +7,10 @@ SCRIPT_PATH="$(cd "$(/usr/bin/dirname "${0}")" && /bin/pwd)"
 ODOO_WORK_DIR="$(cd "${SCRIPT_PATH}/.." && /bin/pwd)"
 cd "${ODOO_WORK_DIR}"
 
-  if [ "$(id -u)" -eq 0 ]; then
-    /bin/echo "Please don't use sudo command with script"
-    exit 1
-  fi
+if [ "$(id -u)" -eq 0 ]; then
+  /bin/echo "Please don't use sudo command with script"
+  exit 1
+fi
 
 if [ -z "${LIBRARIES_VERSION_BRANCH}" ]; then
   if [ "$(/usr/bin/sha1sum "${ODOO_WORK_DIR}/bootstrap" | /usr/bin/awk '{ print $1}')" = "7b53eaced73cc36675859da32bdfb6c2c1c428fe" ] || [ "$(/usr/bin/sha1sum "${ODOO_WORK_DIR}/bootstrap" | /usr/bin/awk '{ print $1}')" = "56f5b836e417fa9c6b1d8cdc2afe5a96c91205a5" ]; then
@@ -149,7 +149,10 @@ else
     /usr/bin/git clone https://github.com/pyenv/pyenv "${PYENV_ROOT}"
   else
     /bin/echo "INFO: ${ODOO_WORK_DIR}/.pyenv exist! Upgrading to latest..."
-    cd "${PYENV_ROOT}" && /usr/bin/git checkout master && /usr/bin/git pull origin master && cd - || { /bin/echo 'Failed to upgrade pyenv'; exit 1; }
+    cd "${PYENV_ROOT}" && /usr/bin/git checkout master && /usr/bin/git pull origin master && cd - || {
+      /bin/echo 'Failed to upgrade pyenv'
+      exit 1
+    }
   fi
   PATH="${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}"
   PYENV="${PYENV_ROOT}/bin/pyenv"
@@ -160,28 +163,21 @@ else
   /bin/echo "Python version is ${PYVERSION}"
 
   # Install virtualenv
-  # virtualenv >= 21.5.0 (released 2026-06-13) dropped support for Python < 3.9
-  # and for creating Python 2.x environments. Odoo <= 15.0 uses Python 2.x or
-  # Python 3.6-3.8, so we install a pinned version via system pip3 for those
-  # targets instead of downloading the latest virtualenv.pyz.
-  if [ "$(/bin/echo "${ODOO_VERSION}" | /usr/bin/cut -d'.' -f1)" -le '15' ]; then
-    /bin/echo "INFO: Installing virtualenv==20.15.1 for Odoo ${ODOO_VERSION} (Python ${PYVERSION}, requires < 3.9 support)"
-    /usr/bin/pip3 install --user --quiet "virtualenv==20.15.1" || \
-    /usr/bin/python3 -m pip install --user --quiet "virtualenv==20.15.1" || \
-    { /bin/echo 'ERROR: Failed to install virtualenv==20.15.1'; exit 1; }
-    /bin/echo "INFO: Build virtual environment in ${ODOO_WORK_DIR}/.venv"
-    /usr/bin/python3 -m virtualenv -p "${PYENV_ROOT}/shims/python" "${ODOO_WORK_DIR}/.venv" || \
-    { /bin/echo 'Virtualenv creation failed'; exit 1; }
-  else
-    VIRTUALENV="${PYENV_ROOT}/bin/virtualenv.pyz"
-    /bin/echo "INFO: Download ${VIRTUALENV}"
-    (/usr/bin/wget --no-check-certificate "https://bootstrap.pypa.io/virtualenv/${PYVERSION}/virtualenv.pyz" -O "${VIRTUALENV}" || \
-    (/bin/echo "INFO: /usr/bin/wget did not download virtualenv package, try /usr/bin/curl ..." && \
-    /usr/bin/curl -L "https://bootstrap.pypa.io/virtualenv/${PYVERSION}/virtualenv.pyz" -o "${VIRTUALENV}")) || \
-    { /bin/echo 'ERROR: Download of virtualenv package failed!'; exit 1; }
-    /bin/echo "INFO: Build virtual environment in ${ODOO_WORK_DIR}/.venv"
-    python "${VIRTUALENV}" .venv || { /bin/echo 'Virtualenv creation failed'; exit 1; }
-  fi
+  VIRTUALENV="${PYENV_ROOT}/bin/virtualenv.pyz"
+  /bin/echo "INFO: Download ${VIRTUALENV}"
+  (/usr/bin/wget --no-check-certificate "https://bootstrap.pypa.io/virtualenv/${PYVERSION}/virtualenv.pyz" -O "${VIRTUALENV}" || \
+  (/bin/echo "INFO: /usr/bin/wget did not download virtualenv package, try /usr/bin/curl ..." && \
+  /usr/bin/curl -L "https://bootstrap.pypa.io/virtualenv/${PYVERSION}/virtualenv.pyz" -o "${VIRTUALENV}")) || \
+  {
+    /bin/echo 'ERROR: Download of virtualenv package failed!'
+    exit 1
+  }
+  /bin/echo "INFO: Build virtual environment in ${ODOO_WORK_DIR}/.venv"
+  python "${VIRTUALENV}" .venv || \
+  {
+    /bin/echo 'Virtualenv creation failed'
+    exit 1
+  }
 fi
 
 if [ ! -f "${ODOO_WORK_DIR}/build" ] || [ -L "${ODOO_WORK_DIR}/build" ]; then
