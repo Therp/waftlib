@@ -32,6 +32,32 @@ GID = int(os.environ.get("GID") or -1)
 log_level = os.environ.get("WAFT_LOG_LEVEL", "INFO")
 
 
+def update_submodules(config):
+    """Run ``git submodule update --init --recursive`` in every aggregated repo.
+
+    :param str config:
+        Path to the ``repos.yaml`` file whose repositories were aggregated.
+    """
+    repos = []
+    with open(config) as yaml_file:
+        for doc in yaml.safe_load_all(yaml_file):
+            for repo in doc or {}:
+                repos.append(os.path.abspath(os.path.join(SRC_DIR, repo)))
+    for repo_path in repos:
+        if not os.path.isdir(os.path.join(repo_path, ".git")) and \
+                not os.path.isfile(os.path.join(repo_path, ".git")):
+            logger.warning("Skipping submodule update, not a git repo: %s", repo_path)
+            continue
+        cmd = ["git", "submodule", "update", "--init", "--recursive"]
+        logger.info("Running '%s' in '%s'", " ".join(cmd), repo_path)
+        check_call(
+            cmd,
+            cwd=repo_path,
+            stderr=sys.stderr,
+            stdout=sys.stdout,
+        )
+
+
 def aggregate(config):
     """Execute git aggregator to pull git code.
 
@@ -62,6 +88,7 @@ def aggregate(config):
             stderr=sys.stderr,
             stdout=sys.stdout,
         )
+        update_submodules(config)
     finally:
         # Restore umask, if changed
         if old_umask is not None:
