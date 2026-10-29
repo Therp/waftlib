@@ -57,6 +57,21 @@ Parameters
 -v          Log debug messages.
 --enterprise-dont-resume
             Don't resume the enterprise upgrade request when given the option.
+--post-jump
+            Restart an enterprise migration right after the first enterprise
+            upgrade: the jump (e.g. 14.0 -> 19.0) or, without a jump, the
+            single step (e.g. 14.0 -> 15.0).
+            If the database is still untouched since that upgrade (marker
+            table waft_post_enterprise_upgrade, dropped by every later step)
+            it is used as it is; otherwise it is restored from the
+            "<PGDATABASE>-<VERSION>-enterprise" copy left by that upgrade
+            (only kept when MIGRATION_NO_BACKUPS is not true). It checks that
+            the database is at that version, rewrites progress.json from the
+            hooks that exist
+            (start version pre-migration + enterprise/pre-migration; target
+            version enterprise/pre-jump, or pre-upgrade + enterprise/pre-upgrade
+            for a single step) and continues with the remaining hooks,
+            OpenUpgrade and post-migration.
 """
 SCRIPT_PATH = os.path.abspath(os.path.dirname(__file__))
 WAFT_DIR = os.path.realpath(os.path.join(SCRIPT_PATH, "../.."))
@@ -425,6 +440,7 @@ def load_defaults(parameters):
             "help": False,
             "no-backups": no_backups,
             "open-upgrade-disabled": open_upgrade_disabled,
+            "post-jump": False,
             "production": False,
             "rebuild": False,
             "reset-progress": False,
@@ -611,6 +627,7 @@ def parse_arguments():
                 "enterprise-autotrust-ssh",
                 "open-upgrade-disabled",
                 "enterprise-jump-to=",
+                "post-jump",
             ],
         )
     except getopt.GetoptError as err:
@@ -646,6 +663,8 @@ def parse_arguments():
             arguments["enterprise-autotrust-ssh"] = True
         if arg == "--enterprise-jump-to":
             arguments["enterprise-jump-to"] = value
+        if arg == "--post-jump":
+            arguments["post-jump"] = True
     return arguments
 
 
@@ -1040,6 +1059,7 @@ def run_enterprise_upgrade(version: str):
         database gets upgraded to.
     """
     logging.info("Running enterprise upgrade to %s..." % version)
+    clear_post_upgrade_marker()
 
     def read_last_line(file):
         last_line = None
@@ -1177,6 +1197,7 @@ def run_enterprise_upgrade(version: str):
             f'"{enterprise_database}"'
         )
         raise e
+    set_post_upgrade_marker(version)
 
 
 def run_migration(start_version, target_version):
@@ -1335,6 +1356,7 @@ def run_script(script_path: str, run_at_version: str | None = None):
     :param run_at_version: The Odoo version of the build that will be used to run the
         Odoo shell.
     """
+    clear_post_upgrade_marker()
     final_version = os.environ["ODOO_VERSION"]
     if not run_at_version:
         run_at_version = db_version
@@ -1369,20 +1391,21 @@ def run_script(script_path: str, run_at_version: str | None = None):
     return True
 
 
-def run_scripts(version: str, hook_name: str, run_at_version: str | None = None):
+def discover_scripts(version: str, hook_name: str):
     """
-    Run all the available scripts for a particular Odoo version and a specific hook.
+    List the (filename, path) of all scripts for a version and hook, in run order.
     """
-
-    logging.info("Loading %s %s scripts...", version, hook_name)
-    if not run_at_version:
-        run_at_version = version
 
     def listdir_full_paths(path):
         if not os.path.exists(path):
             return []
+        # Only regular files: skip directories (e.g. __pycache__) and hidden
+        # files (editor swap files, .gitkeep, ...).
         return [
-            (filename, os.path.join(path, filename)) for filename in os.listdir(path)
+            (filename, os.path.join(path, filename))
+            for filename in os.listdir(path)
+            if not filename.startswith(".")
+            and os.path.isfile(os.path.join(path, filename))
         ]
 
     scripts_path1 = os.path.join(WAFT_DIR, "waftlib/migration/hook", hook_name)
@@ -1397,8 +1420,185 @@ def run_scripts(version: str, hook_name: str, run_at_version: str | None = None)
         + listdir_full_paths(scripts_path3)
         + listdir_full_paths(scripts_path4)
     )
+    return sorted(scripts, key=lambda x: x[0])
 
-    for script_filename, script_path in sorted(scripts, key=lambda x: x[0]):
+
+POST_UPGRADE_MARKER = "waft_post_enterprise_upgrade"
+
+
+def set_post_upgrade_marker(version: str):
+    """
+    Mark the main database as untouched since the enterprise upgrade to `version`.
+
+    Every later step (scripts, OpenUpgrade, further enterprise upgrades) drops
+    the marker first, so its presence proves nothing ran on the database since.
+    """
+    with psycopg.connect("dbname=" + os.environ["PGDATABASE"]) as conn:
+        with conn.cursor() as cur:
+            cur.execute("DROP TABLE IF EXISTS " + POST_UPGRADE_MARKER)
+            cur.execute(
+                "CREATE TABLE " + POST_UPGRADE_MARKER + " (version varchar PRIMARY KEY,"
+                " create_date timestamp DEFAULT (now() at time zone 'UTC'))"
+            )
+            cur.execute(
+                "INSERT INTO " + POST_UPGRADE_MARKER + " (version) VALUES (%s)",
+                [version],
+            )
+
+
+def clear_post_upgrade_marker():
+    """The main database is about to be changed: drop the untouched marker."""
+    try:
+        with psycopg.connect("dbname=" + os.environ["PGDATABASE"]) as conn:
+            with conn.cursor() as cur:
+                cur.execute("DROP TABLE IF EXISTS " + POST_UPGRADE_MARKER)
+    except psycopg.OperationalError:
+        pass  # database doesn't exist (yet)
+
+
+def get_post_upgrade_marker(database: str):
+    """Return the version stored in the untouched marker, or None."""
+    try:
+        with psycopg.connect("dbname=" + database) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass(%s)", [POST_UPGRADE_MARKER])
+                if cur.fetchone()[0] is None:
+                    return None
+                cur.execute("SELECT version FROM " + POST_UPGRADE_MARKER)
+                row = cur.fetchone()
+                return row[0] if row else None
+    except psycopg.OperationalError:
+        return None
+
+
+def database_exists(database: str):
+    """Check whether a database exists."""
+    with psycopg.connect("dbname=postgres") as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", [database])
+            return cur.fetchone() is not None
+
+
+def database_odoo_version(database: str):
+    """Return the major Odoo version (e.g. "19.0") of the base module."""
+    with psycopg.connect("dbname=" + database) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT latest_version FROM ir_module_module WHERE name = 'base'"
+            )
+            row = cur.fetchone()
+    if not row or not row[0]:
+        return None
+    return ".".join(row[0].split(".")[:2])
+
+
+def prepare_post_jump():
+    """
+    Put the database and progress.json back in the state right after the jump.
+
+    Used by --post-jump. Restores the database from the copy that
+    run_enterprise_upgrade() leaves behind ("<db>-<jump>-enterprise"), verifies
+    its version and rebuilds the progress from the hooks that exist, so the
+    migration continues with the enterprise/post-jump hooks.
+    """
+    global progress
+
+    database = os.environ["PGDATABASE"]
+    start_version = params["start-version"]
+    minimum_target = params.get("enterprise-jump-to", ENTERPRISE_MINIMUM_TARGET)
+    if not params["enterprise-enabled"]:
+        raise Exception("--post-jump requires an enterprise migration.")
+    if params["reset-progress"]:
+        raise Exception("--post-jump can't be combined with --reset-progress.")
+    # Same decision as run_migration(): a real jump (e.g. 14.0 -> 19.0) runs
+    # the enterprise/pre-jump hooks; a single step (e.g. 14.0 -> 15.0) is
+    # done in the per-version loop after pre-upgrade + enterprise/pre-upgrade.
+    will_jump = (float(start_version) + 1.0) < float(minimum_target)
+    if will_jump:
+        jump_version = minimum_target
+        jump_hook_names = ["enterprise/pre-jump"]
+    else:
+        jump_version = "%.1f" % (float(start_version) + 1.0)
+        jump_hook_names = ["pre-upgrade", "enterprise/pre-upgrade"]
+    if float(jump_version) > float(os.environ["ODOO_VERSION"]) + 0.001:
+        raise Exception(
+            "--post-jump: first enterprise upgrade (%s) is beyond ODOO_VERSION %s."
+            % (jump_version, os.environ["ODOO_VERSION"])
+        )
+
+    source = "%s-%s-enterprise" % (database, jump_version)
+    if get_post_upgrade_marker(database) == jump_version:
+        logging.info(
+            'Database "%s" is untouched since the enterprise upgrade to %s; '
+            "no restore needed.",
+            database,
+            jump_version,
+        )
+    elif database_exists(source):
+        logging.info('Restoring "%s" from post-jump copy "%s"...', database, source)
+        cmd(["dropdb", "--if-exists", "--force", database])
+        cmd(["createdb", database, "-T", source])
+        filestore_dir = os.path.join(os.environ["HOME"], ".local/share/Odoo/filestore/")
+        filestore = os.path.join(filestore_dir, database)
+        source_filestore = os.path.join(filestore_dir, source)
+        # The jump moves the filestore to the main database; only copy it back
+        # when the main one is missing.
+        if not os.path.exists(filestore) and os.path.exists(source_filestore):
+            cmd(["cp", "-rl", source_filestore, filestore])
+        set_post_upgrade_marker(jump_version)
+    else:
+        raise Exception(
+            'Database "%s" was changed after the enterprise upgrade to %s and the '
+            'post-jump copy "%s" does not exist (MIGRATION_NO_BACKUPS?). '
+            "Nothing to restart from." % (database, jump_version, source)
+        )
+
+    current_version = database_odoo_version(database)
+    if current_version != jump_version:
+        raise Exception(
+            'Database "%s" is at version %s, expected %s (post-jump). '
+            "progress.json left untouched."
+            % (database, current_version, jump_version)
+        )
+
+    def paths(version, hook_name):
+        return [path for _filename, path in discover_scripts(version, hook_name)]
+
+    start_hooks = {"pre-migration": paths(start_version, "pre-migration")}
+    enterprise_pre_migration = paths(start_version, "enterprise/pre-migration")
+    if enterprise_pre_migration:
+        start_hooks["enterprise/pre-migration"] = enterprise_pre_migration
+
+    jump_hooks = {}
+    for hook_name in jump_hook_names:
+        hook_paths = paths(jump_version, hook_name)
+        if hook_paths:
+            jump_hooks[hook_name] = hook_paths
+
+    progress = {
+        start_version: {"hooks": start_hooks, "upgrade": True},
+        jump_version: {"hooks": jump_hooks, "enterprise": True},
+    }
+    save_progress()
+    logging.info(
+        "Progress reset to after the enterprise upgrade: %s pre-migration done, "
+        "%s enterprise upgrade done (%s).",
+        start_version,
+        jump_version,
+        "jump" if will_jump else "single step",
+    )
+
+
+def run_scripts(version: str, hook_name: str, run_at_version: str | None = None):
+    """
+    Run all the available scripts for a particular Odoo version and a specific hook.
+    """
+
+    logging.info("Loading %s %s scripts...", version, hook_name)
+    if not run_at_version:
+        run_at_version = version
+
+    for script_filename, script_path in discover_scripts(version, hook_name):
         if (
             version in progress
             and "hooks" in progress[version]
@@ -1420,6 +1620,7 @@ def run_scripts(version: str, hook_name: str, run_at_version: str | None = None)
 
 def run_upgrade(version):
     """Run a full upgrade to the given Odoo version."""
+    clear_post_upgrade_marker()
     instance = os.environ["PGDATABASE"] + "-" + version
     final_version = os.environ["ODOO_VERSION"]
     build_dir = (
@@ -1539,6 +1740,8 @@ def main():
             return 0
 
         progress = load_progress()
+        if params["post-jump"]:
+            prepare_post_jump()
         logging.debug("Loaded progress: %s", progress)
 
         start_version = (
@@ -1557,7 +1760,7 @@ def main():
         stacktrace = traceback.format_tb(tb)
         logging.error(
             "%s was raised: %s\nStacktrace:\n%s"
-            % (type.__name__, e, "".join(stacktrace))
+            % (_type.__name__, e, "".join(stacktrace))
         )
         return 1
     return 0
