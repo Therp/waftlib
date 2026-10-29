@@ -1182,6 +1182,9 @@ def run_enterprise_upgrade(version: str):
             proc.kill()
 
     mark_enterprise_done(version)
+    # Before copying/renaming, so the copy, the main database and any dump of
+    # the "-enterprise" database all carry the marker.
+    set_post_upgrade_marker(version, enterprise_database)
     try:
         if not params["no-backups"]:
             copy_database(enterprise_database, os.environ["PGDATABASE"], True)
@@ -1426,14 +1429,17 @@ def discover_scripts(version: str, hook_name: str):
 POST_UPGRADE_MARKER = "waft_post_enterprise_upgrade"
 
 
-def set_post_upgrade_marker(version: str):
+def set_post_upgrade_marker(version: str, database: str | None = None):
     """
-    Mark the main database as untouched since the enterprise upgrade to `version`.
+    Mark a database as untouched since the enterprise upgrade to `version`.
 
     Every later step (scripts, OpenUpgrade, further enterprise upgrades) drops
-    the marker first, so its presence proves nothing ran on the database since.
+    the marker from the main database first, so its presence proves nothing
+    ran on the database since. The marker is also written into the
+    "<db>-<version>-enterprise" result itself, so any copy, rename or dump of
+    it is recognised as an untouched post-jump database too.
     """
-    with psycopg.connect("dbname=" + os.environ["PGDATABASE"]) as conn:
+    with psycopg.connect("dbname=" + (database or os.environ["PGDATABASE"])) as conn:
         with conn.cursor() as cur:
             cur.execute("DROP TABLE IF EXISTS " + POST_UPGRADE_MARKER)
             cur.execute(
