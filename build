@@ -33,6 +33,10 @@ if [[ "$(/bin/echo "${ODOO_VERSION}" | /usr/bin/cut -d '.' -f1)" -ge 15 ]]; then
     "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet setuptools
   fi
 else
+  # GCC 15 (Ubuntu 26.04) defaults to C23; old C extensions (reportlab, etc.) need C17.
+  if [[ "$(/bin/echo "${ODOO_VERSION}" | /usr/bin/cut -d '.' -f1)" -le 11 ]]; then
+    export CFLAGS="${CFLAGS:+${CFLAGS} }-std=gnu17"
+  fi && \
   if [[ "$(/bin/echo "${ODOO_VERSION}" | /usr/bin/cut -d '.' -f1)" -eq 11 ]]; then
     "${ODOO_WORK_DIR}/.venv/bin/python" -m pip install --quiet "setuptools<58"
   else
