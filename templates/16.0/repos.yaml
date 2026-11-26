@@ -7,10 +7,6 @@ odoo:
   target: origin ${ODOO_VERSION}
   merges:
     - origin ${ODOO_VERSION}
-  shell_command_after:
-    # CVE-2026-130028 (SQL injection): Odoo publishes no public commit for 16.0 and older
-    - git apply "${ODOO_WORK_DIR}/waftlib/templates/${ODOO_VERSION}/CVE-2026-130028.patch"
-    - git -c user.name=waft -c user.email=waft@localhost commit --quiet --all --message "[SEC] CVE-2026-130028"
 
 OCA/web:
   defaults:
